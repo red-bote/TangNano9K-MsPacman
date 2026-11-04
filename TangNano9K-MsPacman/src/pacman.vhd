@@ -76,7 +76,16 @@ entity PACMAN is
     I_1P_START         : in std_logic; 
     I_2P_START         : in std_logic;
     --
-    AD                 : out std_logic_vector(15 downto 0)
+    AD                 : out std_logic_vector(15 downto 0);
+    -- native video (15 kHz), before the scandoubler, composite sync active low
+    O_R                : out std_logic_vector(2 downto 0);
+    O_G                : out std_logic_vector(2 downto 0);
+    O_B                : out std_logic_vector(1 downto 0);
+    O_COMP_SYNC_L      : out std_logic;
+    -- DIP switches (0x5080), default 3 lives, bonus at 10000, 1 coin 1 credit
+    I_DIP_SW           : in  std_logic_vector(7 downto 0) := "11001001";
+    -- scandoubler scanlines: 00 off, 01 25 %, 10 50 %, 11 75 %
+    I_SCANLINES        : in  std_logic_vector(1 downto 0) := "00"
     );
 end;
 ---------------------------------------------------------------------------------------
@@ -177,6 +186,8 @@ architecture RTL of PACMAN is
     signal video_b_x2       : std_logic_vector(5 downto 0);
     signal hsync_x2         : std_logic;
     signal vsync_x2         : std_logic;
+    -- scandoubler (Verilog) scanlines through a signal, Vivado rejects the literal
+    signal scanlines        : std_logic_vector(1 downto 0) := "00";
     signal blanking_x2      : std_logic_vector(0 downto 0);
     --
     signal audio            : std_logic_vector(7 downto 0);
@@ -663,7 +674,7 @@ begin
 		b_out => video_b_x2,
 		hs_out => hsync_x2,
 		vs_out => vsync_x2,
-		scanlines => "00"
+		scanlines => scanlines
 	);
 -------------------------------------------------------------------------
       O_VIDEO_R <= video_r_x2(5 downto 2);
@@ -671,6 +682,12 @@ begin
       O_VIDEO_B <= video_b_x2(5 downto 2);
       O_HSYNC   <= hSync_X2;
       O_VSYNC   <= vSync_X2;
+
+      O_R           <= video_r;
+      O_G           <= video_g;
+      O_B           <= video_b;
+      O_COMP_SYNC_L <= comp_sync_l;
+      scanlines     <= I_SCANLINES;
 ------------------------------------------------------------------------------------
   u_audio : entity work.PACMAN_AUDIO
     port map (
@@ -727,11 +744,7 @@ begin
 
       freeze <= '0';
 	  -- on is 0      
-		dipsw_reg(7) <= '1'; -- desconocido
-      dipsw_reg(6) <= '1'; -- Cabinet 1=Up / 0=Cocktail
-		dipsw_reg(5 downto 4) <= "00"; -- Bonus Live (11=No bonus 10=20000 01=15000 00=10000)
-      dipsw_reg(3 downto 2) <= "10"; -- Vidas 11=5 / 10=3 / 01=2 / 00=1
-      dipsw_reg(1 downto 0) <= "01"; -- cost  (1 coin, 1 play)
+      dipsw_reg <= I_DIP_SW; -- default: bonus 10000, 3 lives, 1 coin 1 play
     end if;
   end process;
 ----------------------------------------------------------------------------------------------
